@@ -1,0 +1,111 @@
+# This workflow will build a .NET project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net
+
+name: .NET
+
+on:
+  pull_request: 
+    branches: [ "master" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 6.0.x
+    - name: Restore dependencies
+      run: dotnet restore
+    - name: Publish
+      run: |
+        dotnet publish --configuration Release --output ./publish
+
+    - name: Archive published artifacts
+      run: |
+        cd publish
+        tar --exclude="appsettings.json" --exclude="appsettings.Development.json" --exclude="web.config" -czvf published-artifacts.tar.gz *
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: published-artifacts
+        path: ./publish/published-artifacts.tar.gz
+        retention-days: 1
+
+    - name: Path directory
+      run: |
+        ls
+
+  send-file:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Download published artifacts
+      uses: actions/download-artifact@v2
+      with:
+        name: published-artifacts
+        path: ./publish/published-artifacts.tar.gz
+
+    - name: copy file with ssh
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        password: ${{ secrets.PASSWORD }}
+        source: "./publish/published-artifacts.tar.gz"
+        target: C:\Projects
+  reset-iis:
+    needs: send-file
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reset IIS
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
+          script: iisreset
+  site-a:
+    needs: send-file
+    runs-on: ubuntu-latest
+    steps:
+      - name: deploy Site-A
+        if: startsWith(github.event.pull_request.title, 'deploy') && contains(github.event.pull_request.title, 'site-a')
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
+          script: cd ../../ && cd Projects && cd publish/published-artifacts.tar.gz && copy published-artifacts.tar.gz C:\Projects\Site-A && cd ../../ && cd Site-A && tar -xzvf published-artifacts.tar.gz
+  site-b:
+    needs: send-file
+    runs-on: ubuntu-latest
+    steps:
+      - name: deploy Site-B
+        if: startsWith(github.event.pull_request.title, 'deploy') && contains(github.event.pull_request.title, 'site-b')
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
+          script: cd ../../ && cd Projects && cd publish/published-artifacts.tar.gz && copy published-artifacts.tar.gz C:\Projects\Site-B && cd ../../ && cd Site-B && tar -xzvf published-artifacts.tar.gz
+  site-c:
+    needs: send-file
+    runs-on: ubuntu-latest
+    steps:
+      - name: deploy Site-C
+        if: startsWith(github.event.pull_request.title, 'deploy') && contains(github.event.pull_request.title, 'site-c')
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
+          script: cd ../../ && cd Projects && cd publish/published-artifacts.tar.gz && copy published-artifacts.tar.gz C:\Projects\Site-C && cd ../../ && cd Site-C && tar -xzvf published-artifacts.tar.gz
