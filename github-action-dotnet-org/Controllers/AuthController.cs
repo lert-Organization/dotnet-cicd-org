@@ -10,7 +10,7 @@ namespace github_action_dotnet.Controllers
         [HttpGet("Login")]
         public string Login()
         {
-            return "Login Success";
+            return "Login Success!";
         }
     }
 }
