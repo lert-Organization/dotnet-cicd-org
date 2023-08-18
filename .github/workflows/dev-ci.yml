@@ -42,7 +42,9 @@ jobs:
       run: dotnet restore
     - name: Unit test
       run: |
-        echo "Running Unit Test Success"
+        echo "Running Unit Test"
+    - name: fail
+      run: exit 1
     - name: Test Result
       run: |
         echo "Testing fail"
